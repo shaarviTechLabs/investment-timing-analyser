@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Groww — Investment Timing Analyser</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+:root {
+  --ink:#0f0f0f; --paper:#f5f0e8; --paper2:#ede8df; --rule:#d8d2c8;
+  --acc:#c4410c; --acc2:#1a6b3a; --acc3:#1e4d8c; --gold:#b07d2a;
+  --text:#2a2520; --muted:#8a8278;
+  --rs:#fdf0ec; --gs:#edf7f1; --bs:#edf2fb;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:var(--paper);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;}
+.page{max-width:920px;margin:0 auto;padding:48px 28px;}
+
+.masthead{border-bottom:2px solid var(--ink);padding-bottom:20px;margin-bottom:36px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px;}
+.paper-label{font-size:10px;font-family:'DM Mono',monospace;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+h1{font-family:'DM Serif Display',serif;font-size:clamp(24px,5vw,40px);line-height:1.05;color:var(--ink);}
+h1 em{color:var(--acc);font-style:italic;}
+.mh-right{text-align:right;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;line-height:1.9;}
+
+.sec{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+.sec h2{font-family:'DM Serif Display',serif;font-size:17px;color:var(--ink);white-space:nowrap;}
+.sec::after{content:'';flex:1;height:1px;background:var(--rule);}
+
+.upload-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;}
+@media(max-width:580px){.upload-pair{grid-template-columns:1fr;}}
+.utag{font-size:9px;font-family:'DM Mono',monospace;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.ubox{border:1.5px dashed var(--rule);border-radius:4px;padding:26px 18px;text-align:center;cursor:pointer;transition:all .2s;position:relative;background:rgba(255,255,255,.4);}
+.ubox:hover,.ubox.drag-over{border-color:var(--acc);background:var(--rs);}
+.ubox.loaded{border-color:var(--acc2);background:var(--gs);border-style:solid;}
+.ubox input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.uicon{font-size:26px;margin-bottom:8px;}
+.utitle{font-size:13px;font-weight:600;margin-bottom:3px;}
+.usub{font-size:11px;color:var(--muted);line-height:1.5;}
+
+.howto{background:var(--paper2);border:1px solid var(--rule);border-radius:4px;padding:14px 18px;font-size:12px;color:var(--muted);line-height:1.9;margin-bottom:22px;}
+.howto strong{color:var(--acc3);}
+.howto ol{padding-left:18px;margin-top:4px;}
+
+.sstrip{border:1px solid var(--rule);border-radius:4px;padding:11px 16px;font-size:12px;margin-bottom:16px;font-family:'DM Mono',monospace;display:none;}
+.sstrip.ok{border-color:#b8dfc8;background:var(--gs);color:var(--acc2);}
+.sstrip.err{border-color:#f0c4b8;background:var(--rs);color:var(--acc);}
+.sstrip.info{border-color:#c0d4f0;background:var(--bs);color:var(--acc3);}
+
+.pvwrap{overflow-x:auto;border:1px solid var(--rule);border-radius:4px;margin-bottom:20px;background:white;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--paper2);padding:8px 12px;text-align:left;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--rule);font-family:'DM Mono',monospace;white-space:nowrap;}
+td{padding:8px 12px;border-bottom:1px solid rgba(216,210,200,.4);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr.redrow{opacity:.4;}
+
+.chip{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:2px 7px;border-radius:2px;font-family:'DM Mono',monospace;}
+.cbuy{background:var(--gs);color:var(--acc2);border:1px solid #b8dfc8;}
+.csell{background:var(--rs);color:var(--acc);border:1px solid #f0c4b8;}
+.cskip{background:var(--paper2);color:var(--muted);border:1px solid var(--rule);}
+
+.abtn{width:100%;padding:15px;background:var(--ink);color:var(--paper);border:none;border-radius:4px;font-family:'DM Serif Display',serif;font-size:17px;cursor:pointer;transition:background .15s;margin-bottom:32px;display:flex;align-items:center;justify-content:center;gap:10px;}
+.abtn:hover{background:var(--acc);}
+.abtn:disabled{opacity:.5;cursor:not-allowed;background:var(--ink);}
+
+.pgwrap{background:var(--paper2);border:1px solid var(--rule);border-radius:4px;padding:14px 18px;margin-bottom:20px;display:none;}
+.pglbl{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:8px;}
+.pgtrack{height:4px;background:var(--rule);border-radius:2px;overflow:hidden;}
+.pgfill{height:100%;background:var(--acc3);border-radius:2px;transition:width .4s;width:0%;}
+
+/* results hidden by default */
+.results-section{display:none;}
+
+.sumbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin-bottom:32px;}
+.scell{background:white;padding:15px 17px;}
+.slbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:5px;}
+.sval{font-family:'DM Serif Display',serif;font-size:21px;color:var(--ink);}
+.ssub{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px;}
+.sg{color:var(--acc2)!important;} .sr{color:var(--acc)!important;} .sgold{color:var(--gold)!important;}
+
+.fac{background:white;border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin-bottom:18px;}
+.fhdr{padding:15px 18px;border-bottom:1px solid var(--rule);display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;}
+.fname{font-family:'DM Serif Display',serif;font-size:16px;color:var(--ink);margin-bottom:3px;}
+.fmeta{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.vbadge{padding:4px 11px;border-radius:2px;font-size:10px;font-weight:600;font-family:'DM Mono',monospace;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;}
+.vg{background:var(--gs);color:var(--acc2);border:1px solid #b8dfc8;}
+.vo{background:#fff8e8;color:var(--gold);border:1px solid #e8d8a0;}
+.vb{background:var(--rs);color:var(--acc);border:1px solid #f0c4b8;}
+
+.fmetrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:1px;background:var(--rule);border-bottom:1px solid var(--rule);}
+.fm{background:var(--paper);padding:11px 15px;}
+.mlbl{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:4px;}
+.mval{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--ink);}
+.msub{font-size:10px;color:var(--muted);margin-top:2px;}
+.mg{color:var(--acc2)!important;} .mr{color:var(--acc)!important;}
+
+.scorewrap{padding:12px 18px;border-bottom:1px solid var(--rule);background:var(--paper);}
+.scorelbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:7px;}
+.scoretrack{height:8px;background:var(--rule);border-radius:4px;overflow:hidden;}
+.scorefill{height:100%;border-radius:4px;}
+
+.fchrt{padding:16px 18px;border-bottom:1px solid var(--rule);}
+.clbl{font-size:10px;font-family:'DM Mono',monospace;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;}
+.cleg{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;}
+.legitem{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.legdot{width:10px;height:3px;border-radius:1px;}
+
+.insight{padding:13px 18px;font-size:13px;line-height:1.75;color:var(--text);background:var(--paper);}
+.insight strong{color:var(--ink);}
+.ig{color:var(--acc2);font-weight:600;} .ir{color:var(--acc);font-weight:600;} .in{color:var(--gold);font-weight:600;}
+
+.wibox{background:var(--bs);border:1px solid #c0d4f0;border-radius:3px;padding:11px 15px;margin:10px 18px;font-size:12px;line-height:1.9;}
+.wititle{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--acc3);margin-bottom:4px;}
+
+.opttbl{padding:0 18px 14px;}
+.opttbl table{width:100%;border-collapse:collapse;font-size:12px;}
+.opttbl th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-family:'DM Mono',monospace;padding:7px 10px;text-align:left;border-bottom:1px solid var(--rule);background:var(--paper);}
+.opttbl td{padding:7px 10px;border-bottom:1px solid rgba(216,210,200,.35);font-family:'DM Mono',monospace;font-size:11px;}
+.opttbl tr:last-child td{border-bottom:none;}
+.bestrow td{background:rgba(26,107,58,.05);}
+.actrow td{background:rgba(196,65,12,.04);font-weight:600;}
+
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(245,240,232,.3);border-top-color:var(--paper);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:500px){.page{padding:22px 14px;}.fhdr{flex-direction:column;}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<div class="masthead">
+  <div>
+    <div class="paper-label">Mutual Fund Intelligence · Historical Analysis</div>
+    <h1>Did You Buy at the<br><em>Right Time?</em></h1>
+  </div>
+  <div class="mh-right">Powered by MFAPI.in<br>Historical NAV data<br><span id="todayDate"></span></div>
+</div>
+
+<!-- UPLOAD -->
+<div id="uploadSection">
+  <div class="sec"><h2>Upload Your Groww Files</h2></div>
+  <div class="howto">
+    <strong>You need two files — both downloadable free from Groww:</strong>
+    <ol>
+      <li><strong>Holdings Statement</strong> → Groww app → Profile → Reports → Holdings Statement → Excel</li>
+      <li><strong>Order History</strong> → Groww app → Profile → Reports → Mutual Funds Order History → any date range → Excel</li>
+    </ol>
+    Purchase dates and exact NAVs are read automatically from your order history — no manual entry needed.
+  </div>
+
+  <div class="upload-pair">
+    <div>
+      <div class="utag">File 1 — Holdings Statement</div>
+      <div class="ubox" id="dz-h">
+        <input type="file" id="fi-h" accept=".xlsx,.xls">
+        <div class="uicon">📊</div>
+        <div class="utitle">Holdings_Statement.xlsx</div>
+        <div class="usub">Current funds &amp; amounts</div>
+      </div>
+    </div>
+    <div>
+      <div class="utag">File 2 — Order History</div>
+      <div class="ubox" id="dz-o">
+        <input type="file" id="fi-o" accept=".xlsx,.xls">
+        <div class="uicon">🧾</div>
+        <div class="utitle">Order_History.xlsx</div>
+        <div class="usub">Purchase dates &amp; NAVs</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="ss" class="sstrip"></div>
+
+  <div id="previewSection" style="display:none;">
+    <div class="sec"><h2>Detected Transactions</h2></div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;font-family:'DM Mono',monospace;">
+      Only <span style="color:var(--acc2);font-weight:600;">PURCHASE</span> rows for currently-held funds are analysed. Redeemed and net-zero funds are excluded.
+    </p>
+    <div class="pvwrap">
+      <table><thead><tr><th>Scheme</th><th>Type</th><th>Date</th><th>NAV</th><th>Amount</th><th>Units</th><th>Status</th></tr></thead>
+      <tbody id="pvBody"></tbody></table>
+    </div>
+    <button class="abtn" id="analyseBtn"><span>Analyse My Investment Timing</span></button>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div class="pgwrap" id="pgWrap">
+  <div class="pglbl" id="pgLbl">Fetching historical NAV…</div>
+  <div class="pgtrack"><div class="pgfill" id="pgFill"></div></div>
+</div>
+
+<!-- RESULTS -->
+<div class="results-section" id="resultsSection">
+  <div class="sec" style="margin-top:36px;"><h2>Timing Analysis Report</h2></div>
+  <div class="sumbar" id="sumBar"></div>
+  <div id="cardContainer"></div>
+</div>
+
+</div><!-- /page -->
+<script>
+// ── STATE ─────────────────────────────────────────────────────
+var holdingsFunds = [];
+var transactions  = [];
+var analyseFunds  = [];
+var allFundList   = [];
+var filesReady    = {h: false, o: false};
+
+document.getElementById('todayDate').textContent =
+  new Date().toLocaleDateString('en-IN',{day:'numeric',month:'long',year:'numeric'});
+
+// ── HELPERS ───────────────────────────────────────────────────
+function parseNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  return parseFloat(String(v).replace(/[₹,\s]/g,'')) || 0;
+}
+
+function parseGrowwDate(v) {
+  if (!v) return null;
+  var s = String(v).trim();
+  // "02 Mar 2026"
+  var m = s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+  if (m) { var d = new Date(m[2]+' '+m[1]+' '+m[3]); return isNaN(d)?null:d; }
+  // "2026-03-15"
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) { var d2 = new Date(s); return isNaN(d2)?null:d2; }
+  // "15-03-2026"
+  m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (m) { var d3 = new Date(m[3]+'-'+m[2]+'-'+m[1]); return isNaN(d3)?null:d3; }
+  return null;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+}
+
+function fmt(v) {
+  return Math.round(v).toLocaleString('en-IN');
+}
+
+function normName(s) {
+  return String(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+}
+
+function showStatus(type, html) {
+  var el = document.getElementById('ss');
+  el.style.display = 'block';
+  el.className = 'sstrip ' + type;
+  el.innerHTML = html;
+}
+
+function setProg(pct, label) {
+  document.getElementById('pgFill').style.width = Math.round(pct*100)+'%';
+  document.getElementById('pgLbl').textContent = label;
+}
+
+// ── FILE READING ──────────────────────────────────────────────
+function readXLSX(file, cb) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var wb = XLSX.read(new Uint8Array(e.target.result), {type:'array'});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      var rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null});
+      cb(null, rows);
+    } catch(err) { cb(err); }
+  };
+  reader.onerror = function(err) { cb(err); };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── PARSE HOLDINGS ────────────────────────────────────────────
+function handleHoldings(file) {
+  if (!file) return;
+  readXLSX(file, function(err, rows) {
+    if (err) { showStatus('err','Could not read Holdings file: '+err.message); return; }
+    var headerIdx = -1;
+    for (var i=0; i<rows.length; i++) {
+      if (rows[i] && rows[i].some(function(c){ return c && String(c).toLowerCase().includes('scheme name'); })) {
+        headerIdx = i; break;
+      }
+    }
+    if (headerIdx === -1) { showStatus('err','Holdings file: cannot find Scheme Name column.'); return; }
+
+    var headers = rows[headerIdx].map(function(h){ return h ? String(h).toLowerCase().trim() : ''; });
+    var cName = headers.findIndex(function(h){ return h.includes('scheme name'); });
+    var cAmc  = headers.findIndex(function(h){ return h.includes('amc'); });
+    var cCat  = headers.findIndex(function(h){ return h === 'category'; });
+    var cUnits= headers.findIndex(function(h){ return h === 'units'; });
+    var cInv  = headers.findIndex(function(h){ return h.includes('invested'); });
+
+    var raw = {};
+    for (var j=headerIdx+1; j<rows.length; j++) {
+      var r = rows[j];
+      if (!r || !r[cName]) continue;
+      var name = String(r[cName]).trim();
+      if (name.length < 3) continue;
+      var key = normName(name);
+      if (!raw[key]) raw[key] = {schemeName:name, amc:r[cAmc]||'', category:r[cCat]||'', units:0, investedGroww:0};
+      raw[key].units         += cUnits >= 0 ? parseNum(r[cUnits]) : 0;
+      raw[key].investedGroww += cInv   >= 0 ? parseNum(r[cInv])   : 0;
+    }
+
+    holdingsFunds = Object.values(raw);
+    filesReady.h = true;
+    document.getElementById('dz-h').classList.add('loaded');
+    document.getElementById('dz-h').querySelector('.utitle').textContent = '✓ ' + file.name;
+    checkBoth();
+  });
+}
+
+// ── PARSE ORDER HISTORY ───────────────────────────────────────
+function handleOrders(file) {
+  if (!file) return;
+  readXLSX(file, function(err, rows) {
+    if (err) { showStatus('err','Could not read Order History file: '+err.message); return; }
+    var headerIdx = -1;
+    for (var i=0; i<rows.length; i++) {
+      if (rows[i] && rows[i].some(function(c){ return c && String(c).toLowerCase().includes('scheme name'); })) {
+        headerIdx = i; break;
+      }
+    }
+    if (headerIdx === -1) { showStatus('err','Order History file: cannot find headers.'); return; }
+
+    var headers = rows[headerIdx].map(function(h){ return h ? String(h).toLowerCase().trim() : ''; });
+    var cName   = headers.findIndex(function(h){ return h.includes('scheme name'); });
+    var cType   = headers.findIndex(function(h){ return h.includes('transaction type') || h === 'type'; });
+    var cUnits  = headers.findIndex(function(h){ return h === 'units'; });
+    var cNav    = headers.findIndex(function(h){ return h === 'nav'; });
+    var cAmt    = headers.findIndex(function(h){ return h.includes('amount'); });
+    var cDate   = headers.findIndex(function(h){ return h === 'date'; });
+
+    transactions = [];
+    for (var j=headerIdx+1; j<rows.length; j++) {
+      var r = rows[j];
+      if (!r || !r[cName]) continue;
+      var name = String(r[cName]).trim();
+      if (name.length < 3) continue;
+      var txType = cType >= 0 ? String(r[cType]||'').trim().toUpperCase() : '';
+      var date   = cDate >= 0 ? parseGrowwDate(r[cDate]) : null;
+      var nav    = cNav  >= 0 ? parseNum(r[cNav])  : 0;
+      var amount = cAmt  >= 0 ? parseNum(r[cAmt])  : 0;
+      var units  = cUnits>= 0 ? parseNum(r[cUnits]): 0;
+      transactions.push({schemeName:name, txType:txType, date:date, nav:nav, amount:amount, units:units});
+    }
+
+    filesReady.o = true;
+    document.getElementById('dz-o').classList.add('loaded');
+    document.getElementById('dz-o').querySelector('.utitle').textContent = '✓ ' + file.name;
+    checkBoth();
+  });
+}
+
+// ── CROSS-REFERENCE ───────────────────────────────────────────
+function checkBoth() {
+  if (!filesReady.h || !filesReady.o) return;
+
+  var heldKeys = {};
+  holdingsFunds.forEach(function(f){ heldKeys[normName(f.schemeName)] = f; });
+
+  // Net units per fund in order history
+  var netUnits = {};
+  transactions.forEach(function(tx) {
+    var k = normName(tx.schemeName);
+    if (!netUnits[k]) netUnits[k] = 0;
+    if (tx.txType === 'PURCHASE') netUnits[k] += tx.units;
+    else if (tx.txType === 'REDEEM') netUnits[k] -= tx.units;
+  });
+
+  // Keep only PURCHASE rows for currently-held, net-positive funds
+  analyseFunds = [];
+  transactions.forEach(function(tx) {
+    if (tx.txType !== 'PURCHASE') return;
+    var k = normName(tx.schemeName);
+    if (!heldKeys[k]) return;               // not currently held
+    if ((netUnits[k]||0) < 0.001) return;  // fully redeemed
+    var held = heldKeys[k];
+    analyseFunds.push({
+      schemeName:     tx.schemeName,
+      amc:            held.amc,
+      category:       held.category,
+      date:           tx.date,
+      nav:            tx.nav,
+      amount:         tx.amount,
+      units:          tx.units,
+      totalUnitsHeld: held.units,
+      totalInvested:  held.investedGroww,
+      txType:         tx.txType
+    });
+  });
+
+  renderPreview();
+  document.getElementById('previewSection').style.display = '';
+
+  var nFunds = new Set(analyseFunds.map(function(f){ return normName(f.schemeName); })).size;
+  showStatus('ok', '&#10003; Found <strong>' + analyseFunds.length + ' purchase transaction(s)</strong> across <strong>' + nFunds + ' fund(s)</strong> ready to analyse.');
+}
+
+// ── PREVIEW TABLE ─────────────────────────────────────────────
+function renderPreview() {
+  var heldKeys = {};
+  holdingsFunds.forEach(function(f){ heldKeys[normName(f.schemeName)] = true; });
+
+  var html = '';
+  transactions.forEach(function(tx) {
+    var isPurchase = tx.txType === 'PURCHASE';
+    var isHeld     = heldKeys[normName(tx.schemeName)];
+    var willAnalyse= isPurchase && isHeld && analyseFunds.some(function(f){
+      return normName(f.schemeName)===normName(tx.schemeName) && f.date && tx.date && f.date.getTime()===tx.date.getTime();
+    });
+    var rowClass = !isPurchase ? 'redrow' : '';
+    var chip = !isPurchase
+      ? '<span class="chip csell">REDEEM</span>'
+      : !isHeld
+      ? '<span class="chip cskip">Redeemed / not held</span>'
+      : '<span class="chip cbuy">&#10003; Will analyse</span>';
+
+    html += '<tr class="'+rowClass+'">' +
+      '<td style="font-weight:600;font-size:11px;max-width:180px;line-height:1.4">'+tx.schemeName+'</td>' +
+      '<td><span class="chip '+(isPurchase?'cbuy':'csell')+'">'+tx.txType+'</span></td>' +
+      '<td style="font-family:\'DM Mono\',monospace;white-space:nowrap">'+fmtDate(tx.date)+'</td>' +
+      '<td style="font-family:\'DM Mono\',monospace">&#8377;'+tx.nav.toFixed(4)+'</td>' +
+      '<td style="font-family:\'DM Mono\',monospace">&#8377;'+fmt(tx.amount)+'</td>' +
+      '<td style="font-family:\'DM Mono\',monospace">'+tx.units.toFixed(3)+'</td>' +
+      '<td>'+chip+'</td>' +
+      '</tr>';
+  });
+  document.getElementById('pvBody').innerHTML = html;
+}
+
+// ── MFAPI ─────────────────────────────────────────────────────
+function loadFundList() {
+  if (allFundList.length > 0) return Promise.resolve();
+  return fetch('https://api.mfapi.in/mf')
+    .then(function(r){ return r.json(); })
+    .then(function(data){ allFundList = data; })
+    .catch(function(e){ console.warn('Fund list error', e); });
+}
+
+function tokenise(s) {
+  return s.toLowerCase()
+    .replace(/[()&\-\.\/]/g,' ')
+    .replace(/\b(direct|growth|plan|fund|regular|option|dividend|idcw|reinvestment|series|scheme|mutual|fof|etf)\b/gi,'')
+    .split(/\s+/).filter(function(t){ return t.length > 1; });
+}
+
+function bestMatch(name) {
+  if (!allFundList.length) return null;
+  var qt = tokenise(name);
+  var best = null, bestScore = 0;
+  for (var i=0; i<allFundList.length; i++) {
+    var f = allFundList[i];
+    var ft = tokenise(f.schemeName);
+    var score = 0;
+    for (var j=0; j<qt.length; j++) {
+      for (var k=0; k<ft.length; k++) {
+        if (ft[k].includes(qt[j]) || qt[j].includes(ft[k])) { score++; break; }
+      }
+    }
+    if (name.toLowerCase().includes('direct') && f.schemeName.toLowerCase().includes('direct')) score += 0.5;
+    if (name.toLowerCase().includes('growth') && f.schemeName.toLowerCase().includes('growth')) score += 0.5;
+    if (score > bestScore) { bestScore = score; best = f; }
+  }
+  return bestScore >= 2 ? best : null;
+}
+
+function fetchHistory(code) {
+  return fetch('https://api.mfapi.in/mf/'+code)
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      return (data.data||[]).map(function(d) {
+        var parts = String(d.date).split('-');
+        var dt = parts.length===3 ? new Date(parts[2]+'-'+parts[1]+'-'+parts[0]) : new Date(d.date);
+        return {date: dt, nav: parseFloat(d.nav)};
+      }).filter(function(d){ return d.date instanceof Date && !isNaN(d.date.getTime()) && !isNaN(d.nav); });
+    });
+}
+
+// ── RUN ANALYSIS ──────────────────────────────────────────────
+function runAnalysis() {
+  if (!analyseFunds.length) { alert('No purchase transactions to analyse.'); return; }
+
+  var btn = document.getElementById('analyseBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Fetching historical NAV data…';
+  document.getElementById('pgWrap').style.display = 'block';
+
+  loadFundList()
+    .then(function() {
+      if (!allFundList.length) throw new Error('Could not load MFAPI fund list. Check internet connection.');
+      return runSequential(0, []);
+    })
+    .then(function(results) {
+      document.getElementById('pgWrap').style.display = 'none';
+      btn.disabled = false;
+      btn.innerHTML = '&#8635; Re-run Analysis';
+      renderResults(results);
+    })
+    .catch(function(e) {
+      document.getElementById('pgWrap').style.display = 'none';
+      btn.disabled = false;
+      btn.innerHTML = 'Analyse My Investment Timing';
+      showStatus('err', 'Analysis failed: ' + e.message);
+    });
+}
+
+function runSequential(i, results) {
+  if (i >= analyseFunds.length) return Promise.resolve(results);
+
+  var tx = analyseFunds[i];
+  setProg(i / analyseFunds.length, '[' + (i+1) + '/' + analyseFunds.length + '] ' + tx.schemeName.substring(0,40) + '…');
+
+  var match = bestMatch(tx.schemeName);
+  if (!match) {
+    results.push(Object.assign({}, tx, {error: 'Could not match fund in MFAPI: "'+tx.schemeName+'"'}));
+    return runSequential(i+1, results);
+  }
+
+  return fetchHistory(match.schemeCode)
+    .then(function(history) {
+      if (!history.length) {
+        results.push(Object.assign({}, tx, {error: 'No historical data from MFAPI for this fund'}));
+      } else {
+        var result = analyseTx(tx, history, match);
+        results.push(result);
+      }
+      return runSequential(i+1, results);
+    })
+    .catch(function(e) {
+      results.push(Object.assign({}, tx, {error: 'Fetch error: '+e.message}));
+      return runSequential(i+1, results);
+    });
+}
+
+// ── ANALYSIS CORE ─────────────────────────────────────────────
+function analyseTx(tx, history, match) {
+  var WINDOW = 90;
+  var purchaseDate = tx.date;
+  var actualNAV    = tx.nav;
+  var investedAmt  = tx.amount;
+  var unitsBought  = tx.units;
+
+  var wStart = new Date(purchaseDate); wStart.setDate(wStart.getDate() - WINDOW);
+  var wEnd   = new Date(purchaseDate); wEnd.setDate(wEnd.getDate() + WINDOW);
+
+  var windowData = history.filter(function(d){ return d.date >= wStart && d.date <= wEnd; });
+  windowData.sort(function(a,b){ return a.date - b.date; });
+
+  if (windowData.length < 3) {
+    return Object.assign({}, tx, {error: 'Only '+windowData.length+' data points in ±90 day window — too few to analyse'});
+  }
+
+  var navVals   = windowData.map(function(d){ return d.nav; });
+  var minNAV    = Math.min.apply(null, navVals);
+  var maxNAV    = Math.max.apply(null, navVals);
+  var bestEntry = null, worstEntry = null;
+  for (var i=0; i<windowData.length; i++) {
+    if (windowData[i].nav === minNAV && !bestEntry)  bestEntry  = windowData[i];
+    if (windowData[i].nav === maxNAV && !worstEntry) worstEntry = windowData[i];
+  }
+
+  var unitsAtBest  = investedAmt / minNAV;
+  var unitsAtWorst = investedAmt / maxNAV;
+  var extraUnits   = unitsAtBest - unitsBought;
+
+  var latestNAV      = history[0].nav;
+  var actualCurVal   = unitsBought * latestNAV;
+  var bestCaseVal    = unitsAtBest  * latestNAV;
+  var gainVsBest     = bestCaseVal  - actualCurVal;
+
+  var range = maxNAV - minNAV;
+  var timingScore = range > 0 ? Math.max(0, Math.min(1, 1 - (actualNAV - minNAV) / range)) : 1;
+
+  var verdict, vclass;
+  if      (timingScore >= 0.75) { verdict = 'Excellent Timing';  vclass = 'vg'; }
+  else if (timingScore >= 0.40) { verdict = 'Decent Timing';     vclass = 'vo'; }
+  else                          { verdict = 'Could Be Better';   vclass = 'vb'; }
+
+  var daysDiff  = bestEntry ? Math.round(Math.abs(purchaseDate - bestEntry.date) / 86400000) : 0;
+  var direction = bestEntry && purchaseDate < bestEntry.date ? 'later' : 'earlier';
+
+  // Top 5 cheapest days — NO variable name conflicts
+  var sorted = windowData.slice().sort(function(a,b){ return a.nav - b.nav; });
+  var top5 = sorted.slice(0, 5);
+
+  return {
+    schemeName: tx.schemeName,
+    amc: tx.amc, category: tx.category,
+    date: purchaseDate, nav: actualNAV,
+    amount: investedAmt, units: unitsBought,
+    matchedName: match.schemeName, schemeCode: match.schemeCode,
+    history: history, windowData: windowData,
+    actualNAV: actualNAV, investedAmt: investedAmt, unitsBought: unitsBought,
+    minNAV: minNAV, maxNAV: maxNAV,
+    bestEntry: bestEntry, worstEntry: worstEntry,
+    latestNAV: latestNAV,
+    unitsAtBest: unitsAtBest, unitsAtWorst: unitsAtWorst, extraUnits: extraUnits,
+    actualCurVal: actualCurVal, bestCaseVal: bestCaseVal, gainVsBest: gainVsBest,
+    timingScore: timingScore, verdict: verdict, vclass: vclass,
+    daysDiff: daysDiff, direction: direction, top5: top5,
+    error: null
+  };
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────
+function renderResults(results) {
+  // Show results section
+  var section = document.getElementById('resultsSection');
+  section.style.display = 'block';
+
+  // Scroll after a short delay so DOM has updated
+  setTimeout(function(){ section.scrollIntoView({behavior:'smooth'}); }, 200);
+
+  var valid = results.filter(function(r){ return !r.error; });
+  var totalInvested = 0, totalActual = 0, totalBest = 0, totalScore = 0, goodCount = 0;
+  valid.forEach(function(r){
+    totalInvested += r.investedAmt;
+    totalActual   += r.actualCurVal;
+    totalBest     += r.bestCaseVal;
+    totalScore    += r.timingScore;
+    if (r.timingScore >= 0.75) goodCount++;
+  });
+  var avgScore  = valid.length ? totalScore / valid.length : 0;
+  var totalMissed = Math.max(0, totalBest - totalActual);
+
+  var scoreClass = avgScore >= 0.75 ? 'sg' : avgScore >= 0.4 ? 'sgold' : 'sr';
+  document.getElementById('sumBar').innerHTML =
+    '<div class="scell"><div class="slbl">Transactions</div><div class="sval">'+results.length+'</div><div class="ssub">'+valid.length+' analysed · '+(results.length-valid.length)+' skipped</div></div>' +
+    '<div class="scell"><div class="slbl">Total Invested</div><div class="sval">&#8377;'+fmt(totalInvested)+'</div><div class="ssub">In this period</div></div>' +
+    '<div class="scell"><div class="slbl">Avg Timing Score</div><div class="sval '+scoreClass+'">'+Math.round(avgScore*100)+'%</div><div class="ssub">'+goodCount+'/'+valid.length+' timed excellently</div></div>' +
+    '<div class="scell"><div class="slbl">Max Missed Profit</div><div class="sval sgold">&#8377;'+fmt(totalMissed)+'</div><div class="ssub">If all bought at window lows</div></div>';
+
+  var container = document.getElementById('cardContainer');
+  container.innerHTML = '';
+
+  for (var i=0; i<results.length; i++) {
+    var card = buildCard(results[i], i);
+    container.appendChild(card);
+  }
+}
+
+// ── BUILD CARD ────────────────────────────────────────────────
+function buildCard(r, cardIdx) {
+  var div = document.createElement('div');
+  div.className = 'fac';
+
+  if (r.error) {
+    div.innerHTML =
+      '<div class="fhdr"><div><div class="fname">'+r.schemeName+'</div>' +
+      '<div class="fmeta">'+fmtDate(r.date)+'</div></div>' +
+      '<span class="vbadge" style="background:var(--paper2);color:var(--muted);border:1px solid var(--rule)">Skipped</span></div>' +
+      '<div class="insight" style="color:var(--muted);font-size:12px;">'+r.error+'</div>';
+    return div;
+  }
+
+  var scoreBar = Math.round(r.timingScore * 100);
+  var pctAbove = ((r.actualNAV - r.minNAV) / r.minNAV * 100).toFixed(2);
+  var pctBelow = ((r.maxNAV - r.actualNAV) / r.maxNAV * 100).toFixed(2);
+  var fundShort = r.schemeName.split(' ').slice(0,3).join(' ');
+
+  // Insight
+  var insightHtml;
+  if (r.timingScore >= 0.75) {
+    insightHtml = 'You bought <strong>'+fundShort+'</strong> on <strong>'+fmtDate(r.date)+'</strong> at NAV <strong>&#8377;'+r.actualNAV.toFixed(4)+'</strong>. ' +
+      'The window low was <strong>&#8377;'+r.minNAV.toFixed(4)+'</strong> — your purchase was only <span class="ig">'+pctAbove+'% above the cheapest point</span> in the ±90 day window. ' +
+      'Excellent entry. You also stayed <span class="ig">'+pctBelow+'% below</span> the window peak of &#8377;'+r.maxNAV.toFixed(4)+'.';
+  } else if (r.timingScore >= 0.40) {
+    insightHtml = 'You bought at NAV <strong>&#8377;'+r.actualNAV.toFixed(4)+'</strong> on <strong>'+fmtDate(r.date)+'</strong>. ' +
+      'The cheapest NAV in the window was <strong>&#8377;'+r.minNAV.toFixed(4)+'</strong> on <strong>'+fmtDate(r.bestEntry ? r.bestEntry.date : null)+'</strong> — ' +
+      '<span class="in">'+r.daysDiff+' days '+r.direction+' from your purchase</span>. Decent timing, but buying '+r.direction+' by '+r.daysDiff+' days could have cut your cost by '+pctAbove+'%.';
+  } else {
+    insightHtml = 'You bought at NAV <strong>&#8377;'+r.actualNAV.toFixed(4)+'</strong> on <strong>'+fmtDate(r.date)+'</strong>, ' +
+      'which was <span class="ir">'+pctAbove+'% above the window low</span> of &#8377;'+r.minNAV.toFixed(4)+' available on <strong>'+fmtDate(r.bestEntry ? r.bestEntry.date : null)+'</strong>. ' +
+      'Buying '+r.direction+' by '+r.daysDiff+' days would have got you <strong>'+r.extraUnits.toFixed(3)+' more units</strong> for the same &#8377;'+fmt(r.investedAmt)+'.';
+  }
+
+  // What-if
+  var wiHtml = '<div class="wibox"><div class="wititle">What-if: bought on '+fmtDate(r.bestEntry ? r.bestEntry.date : null)+' at &#8377;'+r.minNAV.toFixed(4)+'</div>' +
+    '&#8594; You would hold <strong>'+r.unitsAtBest.toFixed(3)+' units</strong> instead of '+r.unitsBought.toFixed(3)+' &nbsp;&#183;&nbsp; difference: <strong>'+(r.extraUnits>0?'+':'')+r.extraUnits.toFixed(3)+' units</strong><br>' +
+    '&#8594; At today\'s NAV &#8377;'+r.latestNAV.toFixed(4)+', that difference = <strong>&#8377;'+fmt(Math.abs(r.gainVsBest))+' '+(r.gainVsBest>0?'more profit':'you are already ahead!')+'</strong></div>';
+
+  // Top-5 table — use t5row variable, NOT idx to avoid shadowing
+  var t5html = '';
+  for (var t=0; t<r.top5.length; t++) {
+    var row    = r.top5[t];
+    var isBest = (t === 0);
+    var isActual = r.date && row.date && Math.abs(row.date.getTime() - r.date.getTime()) < 3*86400000;
+    var unitsFor = (r.investedAmt / row.nav).toFixed(3);
+    var vsNote   = isBest ? 'Best in window' : isActual ? 'Your purchase' : '+'+((row.nav-r.top5[0].nav)/r.top5[0].nav*100).toFixed(2)+'% vs best';
+    var rowClass = isBest ? 'bestrow' : isActual ? 'actrow' : '';
+    t5html += '<tr class="'+rowClass+'">' +
+      '<td>'+(isBest?'&#127942; ':'')+fmtDate(row.date)+'</td>' +
+      '<td>&#8377;'+row.nav.toFixed(4)+'</td>' +
+      '<td>'+unitsFor+'</td>' +
+      '<td style="color:'+(isBest?'var(--acc2)':'var(--muted)')+'">'+vsNote+'</td>' +
+      '</tr>';
+  }
+
+  var canvasId = 'c' + cardIdx;
+
+  var scoreColor = r.timingScore>=0.75 ? 'var(--acc2)' : r.timingScore>=0.4 ? 'var(--gold)' : 'var(--acc)';
+
+  div.innerHTML =
+    '<div class="fhdr">' +
+      '<div><div class="fname">'+r.schemeName+'</div>' +
+      '<div class="fmeta">'+r.amc+' &middot; '+r.category+' &middot; Purchased '+fmtDate(r.date)+' &middot; &#8377;'+fmt(r.investedAmt)+'</div></div>' +
+      '<span class="vbadge '+r.vclass+'">'+r.verdict+'</span>' +
+    '</div>' +
+
+    '<div class="fmetrics">' +
+      '<div class="fm"><div class="mlbl">Your NAV</div><div class="mval">&#8377;'+r.actualNAV.toFixed(4)+'</div><div class="msub">'+fmtDate(r.date)+'</div></div>' +
+      '<div class="fm"><div class="mlbl">Window Low</div><div class="mval mg">&#8377;'+r.minNAV.toFixed(4)+'</div><div class="msub">'+fmtDate(r.bestEntry?r.bestEntry.date:null)+'</div></div>' +
+      '<div class="fm"><div class="mlbl">Window High</div><div class="mval mr">&#8377;'+r.maxNAV.toFixed(4)+'</div><div class="msub">'+fmtDate(r.worstEntry?r.worstEntry.date:null)+'</div></div>' +
+      '<div class="fm"><div class="mlbl">Units Bought</div><div class="mval">'+r.unitsBought.toFixed(3)+'</div><div class="msub">actual</div></div>' +
+      '<div class="fm"><div class="mlbl">Units at Low</div><div class="mval mg">'+r.unitsAtBest.toFixed(3)+'</div><div class="msub">'+(r.extraUnits>0?'+':'')+r.extraUnits.toFixed(3)+' vs actual</div></div>' +
+      '<div class="fm"><div class="mlbl">Missed Profit</div><div class="mval '+(r.gainVsBest>0?'mr':'mg')+'">&#8377;'+fmt(Math.abs(r.gainVsBest))+'</div><div class="msub">'+(r.gainVsBest>0?'could have earned more':'you are ahead!')+'</div></div>' +
+    '</div>' +
+
+    '<div class="scorewrap">' +
+      '<div class="scorelbl">Timing Score: '+scoreBar+'% &mdash; '+r.verdict+'</div>' +
+      '<div class="scoretrack"><div class="scorefill" style="width:'+scoreBar+'%;background:'+scoreColor+'"></div></div>' +
+    '</div>' +
+
+    '<div class="fchrt">' +
+      '<div class="clbl">NAV History &mdash; &plusmn;90 Days Around '+fmtDate(r.date)+'</div>' +
+      '<canvas id="'+canvasId+'" style="width:100%;height:150px;display:block;"></canvas>' +
+      '<div class="cleg">' +
+        '<div class="legitem"><div class="legdot" style="background:#1e4d8c"></div>NAV</div>' +
+        '<div class="legitem"><div class="legdot" style="background:var(--acc);height:10px;width:3px;border-radius:1px"></div>Your purchase</div>' +
+        '<div class="legitem"><div class="legdot" style="background:var(--acc2);height:10px;width:3px;border-radius:1px"></div>Optimal entry</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div class="insight">'+insightHtml+'</div>' +
+    wiHtml +
+    '<div class="opttbl"><table>' +
+      '<thead><tr><th>Date</th><th>NAV</th><th>Units for &#8377;'+fmt(r.investedAmt)+'</th><th>Note</th></tr></thead>' +
+      '<tbody>'+t5html+'</tbody>' +
+    '</table></div>';
+
+  // Draw chart after DOM insertion, with delay to ensure layout
+  var chartData = r;
+  var cid = canvasId;
+  setTimeout(function(){ drawChart(chartData, cid); }, 300 + cardIdx * 50);
+
+  return div;
+}
+
+// ── CHART ─────────────────────────────────────────────────────
+function drawChart(r, cid) {
+  var canvas = document.getElementById(cid);
+  if (!canvas) return;
+
+  var parent = canvas.parentElement;
+  var W = parent ? Math.max(parent.clientWidth - 36, 200) : 400;
+  var H = 150;
+  var dpr = window.devicePixelRatio || 1;
+
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  var data = r.windowData;
+  if (!data || data.length < 2) { ctx.fillStyle='#999'; ctx.font='12px sans-serif'; ctx.fillText('Not enough data',10,H/2); return; }
+
+  var navVals = data.map(function(d){ return d.nav; });
+  var minN = Math.min.apply(null, navVals) * 0.997;
+  var maxN = Math.max.apply(null, navVals) * 1.003;
+  var rangeN = maxN - minN || 1;
+
+  function toX(i){ return (i / (data.length-1)) * W; }
+  function toY(v){ return H - ((v - minN) / rangeN) * (H - 28) - 14; }
+
+  // Background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#f0ebe2'; ctx.lineWidth = 1;
+  [0.25, 0.5, 0.75].forEach(function(p){
+    var y = 14 + p*(H-28);
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  });
+
+  // Area fill
+  var grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(30,77,140,0.10)');
+  grad.addColorStop(1,'rgba(30,77,140,0.01)');
+  ctx.beginPath();
+  for (var i=0; i<data.length; i++) {
+    if (i===0) ctx.moveTo(toX(i), toY(data[i].nav));
+    else ctx.lineTo(toX(i), toY(data[i].nav));
+  }
+  ctx.lineTo(toX(data.length-1), H); ctx.lineTo(0,H); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // NAV line
+  ctx.beginPath();
+  for (var i=0; i<data.length; i++) {
+    if (i===0) ctx.moveTo(toX(i), toY(data[i].nav));
+    else ctx.lineTo(toX(i), toY(data[i].nav));
+  }
+  ctx.strokeStyle = '#1e4d8c'; ctx.lineWidth = 2; ctx.setLineDash([]); ctx.stroke();
+
+  // Purchase marker (red)
+  var aIdx = -1;
+  for (var i=0; i<data.length; i++) {
+    if (r.date && Math.abs(data[i].date.getTime() - r.date.getTime()) < 3*86400000) { aIdx = i; break; }
+  }
+  if (aIdx >= 0) {
+    var ax = toX(aIdx), ay = toY(data[aIdx].nav);
+    ctx.strokeStyle='rgba(196,65,12,0.3)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(ax,0); ctx.lineTo(ax,H); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(ax,ay,6,0,Math.PI*2); ctx.fillStyle='#c4410c'; ctx.fill();
+    ctx.beginPath(); ctx.arc(ax,ay,3,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+  }
+
+  // Optimal marker (green)
+  var bIdx = -1;
+  for (var i=0; i<data.length; i++) {
+    if (data[i].nav === r.minNAV) { bIdx = i; break; }
+  }
+  if (bIdx >= 0) {
+    var bx = toX(bIdx), by = toY(data[bIdx].nav);
+    ctx.strokeStyle='rgba(26,107,58,0.3)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(bx,0); ctx.lineTo(bx,H); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(bx,by,6,0,Math.PI*2); ctx.fillStyle='#1a6b3a'; ctx.fill();
+    ctx.beginPath(); ctx.arc(bx,by,3,0,Math.PI*2); ctx.fillStyle='white'; ctx.fill();
+  }
+
+  // Y labels
+  ctx.fillStyle='#8a8278'; ctx.font='10px DM Mono,monospace'; ctx.textAlign='left';
+  ctx.fillText('\u20B9'+maxN.toFixed(1), 3, 11);
+  ctx.fillText('\u20B9'+minN.toFixed(1), 3, H-3);
+
+  // X labels
+  ctx.textAlign='center';
+  var pts = [[0, data[0].date], [Math.floor(data.length/2), data[Math.floor(data.length/2)].date], [data.length-1, data[data.length-1].date]];
+  pts.forEach(function(p){ ctx.fillText(fmtDate(p[1]), toX(p[0]), H-2); });
+}
+
+// ── WIRE UP FILE INPUTS ───────────────────────────────────────
+document.getElementById('fi-h').addEventListener('change', function(){ handleHoldings(this.files[0]); });
+document.getElementById('fi-o').addEventListener('change', function(){ handleOrders(this.files[0]); });
+document.getElementById('analyseBtn').addEventListener('click', runAnalysis);
+
+// Drag & drop
+['h','o'].forEach(function(key) {
+  var dz = document.getElementById('dz-'+key);
+  dz.addEventListener('dragover',  function(e){ e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', function(){ dz.classList.remove('drag-over'); });
+  dz.addEventListener('drop', function(e) {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    var f = e.dataTransfer.files[0];
+    if (f) { key==='h' ? handleHoldings(f) : handleOrders(f); }
+  });
+});
+</script>
+</body>
+</html>
